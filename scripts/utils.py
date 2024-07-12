@@ -4,7 +4,7 @@
 def define_image_size(uniform, dataset):
     img_size = (0, 0)
     if uniform == 'True':
-        img_size = (800, 800)
+        img_size = (720, 720)
     else:
         if dataset == 'HRF-AV':
             img_size = (880, 592)

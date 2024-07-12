@@ -8,12 +8,9 @@ from glob import glob
 import torch
 from torch.utils.data import Dataset
 import logging
-from torchvision import utils
 import random
-from torchvision.utils import save_image
 from scipy.ndimage import rotate
 from PIL import Image, ImageEnhance
-from torchvision.transforms import functional as F
 
 
 class LearningAVSegData(Dataset):
@@ -27,30 +24,14 @@ class LearningAVSegData(Dataset):
         self.train_or = train_or
 
         i = 0
-        self.ids = [splitext(file)[0] for file in listdir(imgs_dir)
-                    if not file.startswith('.')]
-        #logging.info(f'Creating dataset with {(self.ids)} ')
+        self.ids = [splitext(file)[0] for file in listdir(imgs_dir) if not file.startswith('.')]
         logging.info(f'Creating dataset with {len(self.ids)} examples')
 
     def __len__(self):
         return len(self.ids)
 
     @classmethod
-    def pad_imgs(self, imgs, img_size):
-        img_h, img_w = imgs.shape[0], imgs.shape[1]
-        target_h, target_w = img_size[0], img_size[1]
-        if len(imgs.shape) == 3:
-            d = imgs.shape[2]
-            padded = np.zeros((target_h, target_w, d))
-        elif len(imgs.shape) == 2:
-            padded = np.zeros((target_h, target_w))
-        padded[(target_h - img_h) // 2:(target_h - img_h) // 2 + img_h,
-        (target_w - img_w) // 2:(target_w - img_w) // 2 + img_w, ...] = imgs
-        #print(np.shape(padded))
-        return padded
-
-    @classmethod
-    def random_perturbation(self, imgs):
+    def random_perturbation(cls, imgs):
         for i in range(imgs.shape[0]):
             im = Image.fromarray(imgs[i, ...].astype(np.uint8))
             en = ImageEnhance.Color(im)
@@ -89,13 +70,13 @@ class LearningAVSegData(Dataset):
         return im
 
     @classmethod
-    def preprocess(self, pil_img, label, mask, dataset_name, img_size, train_or):
+    def preprocess(cls, pil_img, label, mask, dataset_name, img_size, train_or):
 
         """ Correct Issues in Labels where values are too unique """
-        label = self.correct_label_colors(label)
+        label = cls.correct_label_colors(label)
 
-        newW, newH = img_size[0], img_size[1]
-        assert newW > 0 and newH > 0, 'Scale is too small'
+        new_w, new_h = img_size[0], img_size[1]
+        assert new_w > 0 and new_h > 0, 'Scale is too small'
 
         img_array = np.array(pil_img)
         label_array = np.array(label)
@@ -115,7 +96,7 @@ class LearningAVSegData(Dataset):
             angle = 90 * np.random.randint(4)
             img_array = rotate(img_array, angle, axes=(0, 1), reshape=False)
 
-            img_array = self.random_perturbation(img_array)
+            img_array = cls.random_perturbation(img_array)
 
             label_array = np.round(rotate(label_array, angle, axes=(0, 1), reshape=False, mode='nearest'))
             mask_array = np.round(rotate(mask_array, angle, axes=(0, 1), reshape=False))
@@ -175,7 +156,7 @@ class LearningAVSegData(Dataset):
         i += 1
         return {
             'name': idx,
-            'image': torch.from_numpy(img).type(torch.FloatTensor),
-            'label': torch.from_numpy(label).type(torch.FloatTensor),
-            'mask': torch.from_numpy(mask).type(torch.FloatTensor)
+            'image': torch.from_numpy(img).type(torch.float),
+            'label': torch.from_numpy(label).type(torch.float),
+            'mask': torch.from_numpy(mask).type(torch.float)
         }

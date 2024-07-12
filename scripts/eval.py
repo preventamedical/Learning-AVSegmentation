@@ -60,7 +60,6 @@ def misc_measures(true_vessel_arr, pred_vessel_arr):
     mse = mean_squared_error(true_vessel_arr, pred_vessel_arr)
 
     try:
-        print(cm)
         acc = 1. * (cm[0, 0] + cm[1, 1]) / np.sum(cm)
         sensitivity = 1. * cm[1, 1] / (cm[1, 0] + cm[1, 1])
         specificity = 1. * cm[0, 0] / (cm[0, 1] + cm[0, 0])

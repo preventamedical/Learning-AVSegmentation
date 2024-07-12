@@ -3,6 +3,7 @@
 
 import argparse
 import logging
+import math
 import os
 import torch
 import torch.nn as nn
@@ -29,25 +30,29 @@ def train_net(net_G,
               gama_hyper=0.08,
               lr=0.001,
               val_percent=0.1,
+              test_percent=0.1,
               image_size=(592, 880),
               save_cp=True,
               ):
     # define data path and checkpoint path
     dir_checkpoint = f"./{args.dataset}/{args.jn}/Discriminator_{args.dis}/"
-    train_dir = f"./data/{args.dataset}/training/images/"
-    label_dir = f"./data/{args.dataset}/training/1st_manual/"
-    mask_dir = f"./data/{args.dataset}/training/mask/"
+    train_dir = f"./data/{args.dataset}/all/images/"
+    label_dir = f"./data/{args.dataset}/all/labels/"
+    mask_dir = f"./data/{args.dataset}/all/masks/"
 
     # create folders
     if not os.path.isdir(dir_checkpoint):
         os.makedirs(dir_checkpoint)
 
     dataset = LearningAVSegData(train_dir, label_dir, mask_dir, image_size, args.dataset, train_or=True)
-    n_val = int(len(dataset) * val_percent)
-    n_train = len(dataset) - n_val
-    train, val = random_split(dataset, [n_train, n_val], generator=torch.Generator().manual_seed(args.seed))
-    train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=2, pin_memory=True)
-    val_loader = DataLoader(val, batch_size=1, shuffle=False, num_workers=1, pin_memory=True, drop_last=False)
+    n_dataset = len(dataset)
+    n_val = math.ceil(n_dataset * val_percent)
+    n_test = math.ceil(n_dataset * test_percent)
+    n_train = n_dataset - n_val - n_test
+
+    train, val, _ = random_split(dataset, [n_train, n_val, n_test], generator=torch.Generator().manual_seed(args.seed))
+    train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True)
+    val_loader = DataLoader(val, batch_size=1, shuffle=False, num_workers=0, pin_memory=True, drop_last=False)
 
     writer = SummaryWriter(comment=f'Task_{args.jn}_LR_{lr}_BS_{batch_size}')
     global_step = 0
