@@ -13,39 +13,39 @@ from scripts.utils import Define_image_size
 
 
 def test_net(net_all, net_a, net_v, loader, device, mode, dataset_train):
-
     epoch = 0
 
     acc, sent, spet, pret, G_t, F1t, mset, iout, \
         acc_a, sent_a, spet_a, pret_a, G_t_a, F1t_a, mset_a, iout_a, \
-            acc_v, sent_v, spet_v, pret_v, G_t_v, F1t_v, mset_v, iout_v, \
-                acc_u, sent_u, spet_u, pret_u, G_t_u, F1t_u, mset_u, iout_u  = eval_net(epoch, net_all, net_a, net_v, dataset_train, loader=loader, device=device, mode = mode, train_or='val')
+        acc_v, sent_v, spet_v, pret_v, G_t_v, F1t_v, mset_v, iout_v, \
+        acc_u, sent_u, spet_u, pret_u, G_t_u, F1t_u, mset_u, iout_u = eval_net(epoch, net_all, net_a, net_v,
+                                                                               dataset_train, loader=loader,
+                                                                               device=device, mode=mode, train_or='val')
 
-    
     if mode != 'vessel':
         return acc, sent, spet, pret, G_t, F1t, mset, iout, \
-                acc_a, sent_a, spet_a, pret_a, G_t_a, F1t_a, mset_a, iout_a, \
-                acc_v, sent_v, spet_v, pret_v, G_t_v, F1t_v, mset_v, iout_v, \
-                acc_u, sent_u, spet_u, pret_u, G_t_u, F1t_u, mset_u, iout_u
+            acc_a, sent_a, spet_a, pret_a, G_t_a, F1t_a, mset_a, iout_a, \
+            acc_v, sent_v, spet_v, pret_v, G_t_v, F1t_v, mset_v, iout_v, \
+            acc_u, sent_u, spet_u, pret_u, G_t_u, F1t_u, mset_u, iout_u
     else:
         return acc, sensitivity, specificity, precision, G, F1_score_2
-    
-
 
 
 def get_args():
-    parser = argparse.ArgumentParser(description='Train the UNet on images and target masks', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(description='Train the UNet on images and target masks',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument('--batch-size', type=int, default=6, help='Batch size', dest='batchsize')
     parser.add_argument('--job_name', type=str, default='J', help='type of discriminator', dest='jn')
     parser.add_argument('--dataset', type=str, help='test dataset name', dest='dataset')
-    parser.add_argument('--uniform', type=str, default='False', help='whether to uniform the image size', dest='uniform')
+    parser.add_argument('--uniform', type=str, default='False', help='whether to uniform the image size',
+                        dest='uniform')
 
     return parser.parse_args()
 
 
 if __name__ == '__main__':
-    
+
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     args = get_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -53,11 +53,11 @@ if __name__ == '__main__':
 
     img_size = Define_image_size(args.uniform, args.dataset)
     dataset_name = args.dataset
-    checkpoint_saved = dataset_name + '/' +args.jn + '/Discriminator_unet/'
-    
-    test_dir= "./data/{}/test/images/".format(dataset_name)
-    test_label = "./data/{}/test/1st_manual/".format(dataset_name)
-    test_mask =  "./data/{}/test/mask/".format(dataset_name)
+    checkpoint_saved = dataset_name + '/' + args.jn + '/Discriminator_unet/'
+
+    test_dir = f"./data/{dataset_name}/training/images/"
+    test_label = f"./data/{dataset_name}/training/1st_manual/"
+    test_mask = f"./data/{dataset_name}/training/mask/"
 
     mode = 'whole'
 
@@ -98,18 +98,18 @@ if __name__ == '__main__':
     iou_total = []
 
     dataset = LearningAVSegData(test_dir, test_label, test_mask, img_size, dataset_name=dataset_name, train_or=False)
-    test_loader = DataLoader(dataset, batch_size=args.batchsize, shuffle=False, num_workers=2, pin_memory=True, drop_last=True)
-    net_G = Generator_main(input_channels=3, n_filters = 32, n_classes=4, bilinear=False)
-    net_G_A = Generator_branch(input_channels=3, n_filters = 32, n_classes=4, bilinear=False)
-    net_G_V = Generator_branch(input_channels=3, n_filters = 32, n_classes=4, bilinear=False)
-
-
+    test_loader = DataLoader(dataset, batch_size=args.batchsize, shuffle=False, num_workers=2, pin_memory=True,
+                             drop_last=True)
+    net_G = Generator_main(input_channels=3, n_filters=32, n_classes=4, bilinear=False)
+    net_G_A = Generator_branch(input_channels=3, n_filters=32, n_classes=4, bilinear=False)
+    net_G_V = Generator_branch(input_channels=3, n_filters=32, n_classes=4, bilinear=False)
 
     for i in range(1):
-        checkpoint_path_ = "./{}/{}_{}/Discriminator_unet/".format(dataset_name, args.jn,42-2*i)
-        net_G.load_state_dict(torch.load( checkpoint_path_ + 'CP_best_F1_all.pth'))
-        net_G_A.load_state_dict(torch.load( checkpoint_path_ + 'CP_best_F1_A.pth'))
-        net_G_V.load_state_dict(torch.load(checkpoint_path_ + 'CP_best_F1_V.pth'))
+        model_name = args.jn.split('_randomseed')[0]
+        checkpoint_path_ = f"./{model_name}/{args.jn}/Discriminator_unet/"
+        net_G.load_state_dict(torch.load(checkpoint_path_ + 'CP_best_F1_G.pth', map_location=device))
+        net_G_A.load_state_dict(torch.load(checkpoint_path_ + 'CP_best_F1_A.pth', map_location=device))
+        net_G_V.load_state_dict(torch.load(checkpoint_path_ + 'CP_best_F1_V.pth', map_location=device))
         net_G.eval()
         net_G_A.eval()
         net_G_V.eval()
@@ -117,14 +117,17 @@ if __name__ == '__main__':
         net_G_A.to(device=device)
         net_G_V.to(device=device)
 
-
         if mode != 'vessel':
             acc, sent, spet, pret, G_t, F1t, mset, iout, \
                 acc_a, sent_a, spet_a, pret_a, G_t_a, F1t_a, mset_a, iout_a, \
                 acc_v, sent_v, spet_v, pret_v, G_t_v, F1t_v, mset_v, iout_v, \
-                acc_u, sent_u, spet_u, pret_u, G_t_u, F1t_u, mset_u, iout_u = test_net(net_all=net_G, net_a=net_G_A, net_v=net_G_V, loader=test_loader, device=device, mode=mode, dataset_train=dataset_name)
+                acc_u, sent_u, spet_u, pret_u, G_t_u, F1t_u, mset_u, iout_u = test_net(net_all=net_G, net_a=net_G_A,
+                                                                                       net_v=net_G_V,
+                                                                                       loader=test_loader,
+                                                                                       device=device, mode=mode,
+                                                                                       dataset_train=dataset_name)
 
-    #########################################3
+        #########################################3
         acc_total_a.append(acc_a)
         sensitivity_total_a.append(sent_a)
         specificity_total_a.append(spet_a)
@@ -134,8 +137,7 @@ if __name__ == '__main__':
         mse_total_a.append(mset_a)
         iou_total_a.append(iout_a)
 
-
-    ###########################################
+        ###########################################
         acc_total_v.append(acc_v)
         sensitivity_total_v.append(sent_v)
         specificity_total_v.append(spet_v)
@@ -145,8 +147,7 @@ if __name__ == '__main__':
         mse_total_v.append(mset_v)
         iou_total_v.append(iout_v)
 
-
-    ############################################
+        ############################################
         acc_total_u.append(acc_u)
         sensitivity_total_u.append(sent_u)
         specificity_total_u.append(spet_u)
@@ -156,8 +157,7 @@ if __name__ == '__main__':
         mse_total_u.append(mset_u)
         iou_total_u.append(iout_u)
 
-
-    ###########################################
+        ###########################################
         acc_total.append(acc)
         sensitivity_total.append(sent)
         specificity_total.append(spet)
@@ -167,67 +167,57 @@ if __name__ == '__main__':
         mse_total.append(mset)
         iou_total.append(iout)
 
+    print('########################################3')
+    print('ARTERY')
+    print('#########################################')
 
+    print('Accuracy: ', np.mean(acc_total_a))
+    print('Sensitivity: ', np.mean(sensitivity_total_a))
+    print('specificity: ', np.mean(specificity_total_a))
+    print('precision: ', np.mean(precision_total_a))
+    print('G: ', np.mean(G_total_a))
+    print('F1_score_2: ', np.mean(F1_score_2_total_a))
+    print('MSE: ', np.mean(mse_total_a))
+    print('iou: ', np.mean(iou_total_a))
 
-print('########################################3')
-print('ARTERY')
-print('#########################################')
+    #############################################3
+    print('########################################3')
+    print('VEIN')
+    print('#########################################')
+    #############################################3
+    print('Accuracy: ', np.mean(acc_total_v))
+    print('Sensitivity: ', np.mean(sensitivity_total_v))
+    print('specificity: ', np.mean(specificity_total_v))
+    print('precision: ', np.mean(precision_total_v))
+    print('G: ', np.mean(G_total_v))
+    print('F1_score_2: ', np.mean(F1_score_2_total_v))
+    print('MSE: ', np.mean(mse_total_v))
+    print('iou: ', np.mean(iou_total_v))
 
-print('Accuracy: ', np.mean(acc_total_a))
-print('Sensitivity: ', np.mean(sensitivity_total_a))
-print('specificity: ', np.mean(specificity_total_a))
-print('precision: ', np.mean(precision_total_a))
-print('G: ', np.mean(G_total_a))
-print('F1_score_2: ', np.mean(F1_score_2_total_a))
-print('MSE: ', np.mean(mse_total_a))
-print('iou: ', np.mean(iou_total_a))
+    ###########################################
+    print('########################################3')
+    print('UNCERTAIN')
+    print('#########################################')
+    ################################################
+    print('Accuracy: ', np.mean(acc_total_u))
+    print('Sensitivity: ', np.mean(sensitivity_total_u))
+    print('specificity: ', np.mean(specificity_total_u))
+    print('precision: ', np.mean(precision_total_u))
+    print('G: ', np.mean(G_total_u))
+    print('F1_score_2: ', np.mean(F1_score_2_total_u))
+    print('MSE: ', np.mean(mse_total_u))
+    print('iou: ', np.mean(iou_total_u))
 
-#############################################3
-print('########################################3')
-print('VEIN')
-print('#########################################')
-#############################################3
-print('Accuracy: ', np.mean(acc_total_v))
-print('Sensitivity: ', np.mean(sensitivity_total_v))
-print('specificity: ', np.mean(specificity_total_v))
-print('precision: ', np.mean(precision_total_v))
-print('G: ', np.mean(G_total_v))
-print('F1_score_2: ', np.mean(F1_score_2_total_v))
-print('MSE: ', np.mean(mse_total_v))
-print('iou: ', np.mean(iou_total_v))
-
-
-###########################################
-print('########################################3')
-print('UNCERTAIN')
-print('#########################################')
-################################################
-print('Accuracy: ', np.mean(acc_total_u))
-print('Sensitivity: ', np.mean(sensitivity_total_u))
-print('specificity: ', np.mean(specificity_total_u))
-print('precision: ', np.mean(precision_total_u))
-print('G: ', np.mean(G_total_u))
-print('F1_score_2: ', np.mean(F1_score_2_total_u))
-print('MSE: ', np.mean(mse_total_u))
-print('iou: ', np.mean(iou_total_u))
-
-
-##########################################
-print('########################################3')
-print('AVERAGE')
-print('#########################################')
-##########################################
-print('Accuracy: ', np.mean(acc_total))
-print('Sensitivity: ', np.mean(sensitivity_total))
-print('specificity: ', np.mean(specificity_total))
-print('precision: ', np.mean(precision_total))
-print('G: ', np.mean(G_total))
-print('F1_score_2: ', np.mean(F1_score_2_total))
-print('MSE: ', np.mean(mse_total))
-print('iou: ', np.mean(iou_total))
-
-
-
-
-
-
+    ##########################################
+    print('########################################3')
+    print('AVERAGE')
+    print('#########################################')
+    ##########################################
+    print('Accuracy: ', np.mean(acc_total))
+    print('Sensitivity: ', np.mean(sensitivity_total))
+    print('specificity: ', np.mean(specificity_total))
+    print('precision: ', np.mean(precision_total))
+    print('G: ', np.mean(G_total))
+    print('F1_score_2: ', np.mean(F1_score_2_total))
+    print('MSE: ', np.mean(mse_total))
+    print('iou: ', np.mean(iou_total))

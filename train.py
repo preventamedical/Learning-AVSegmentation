@@ -10,12 +10,11 @@ from torch import optim
 from tqdm import tqdm
 from scripts.eval import eval_net
 from scripts.model import Discriminator, Generator_main, Generator_branch
-from scripts.utils import Define_image_size
+from scripts.utils import define_image_size
 from scripts.dataset import LearningAVSegData
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader, random_split
 import torch.nn.functional as F
-
 
 
 def train_net(net_G,
@@ -25,20 +24,19 @@ def train_net(net_G,
               device,
               epochs=5,
               batch_size=1,
-              alpha_hyper = 0.5,
-              beta_hyper = 1.1,
-              gama_hyper = 0.08,
+              alpha_hyper=0.5,
+              beta_hyper=1.1,
+              gama_hyper=0.08,
               lr=0.001,
               val_percent=0.1,
-              image_size=(592,880),
+              image_size=(592, 880),
               save_cp=True,
               ):
-
     # define data path and checkpoint path
-    dir_checkpoint="./{}/{}/Discriminator_{}/".format(args.dataset,args.jn,args.dis)
-    train_dir= "./data/{}/training/images/".format(args.dataset)
-    label_dir = "./data/{}/training/1st_manual/".format(args.dataset)
-    mask_dir = "./data/{}/training/mask/".format(args.dataset)
+    dir_checkpoint = f"./{args.dataset}/{args.jn}/Discriminator_{args.dis}/"
+    train_dir = f"./data/{args.dataset}/training/images/"
+    label_dir = f"./data/{args.dataset}/training/1st_manual/"
+    mask_dir = f"./data/{args.dataset}/training/mask/"
 
     # create folders
     if not os.path.isdir(dir_checkpoint):
@@ -50,7 +48,6 @@ def train_net(net_G,
     train, val = random_split(dataset, [n_train, n_val], generator=torch.Generator().manual_seed(args.seed))
     train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=2, pin_memory=True)
     val_loader = DataLoader(val, batch_size=1, shuffle=False, num_workers=1, pin_memory=True, drop_last=False)
-
 
     writer = SummaryWriter(comment=f'Task_{args.jn}_LR_{lr}_BS_{batch_size}')
     global_step = 0
@@ -65,11 +62,13 @@ def train_net(net_G,
         Device:          {device.type}
         alpha:           {alpha_hyper}
     ''')
-    
+
     optimizer_G = optim.Adam(net_G.parameters(), lr=lr, betas=(0.5, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
     optimizer_D = optim.Adam(net_D.parameters(), lr=lr, betas=(0.5, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
-    optimizer_G_A = optim.Adam(net_G_A.parameters(), lr=lr, betas=(0.5, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
-    optimizer_G_V = optim.Adam(net_G_V.parameters(), lr=lr, betas=(0.5, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
+    optimizer_G_A = optim.Adam(net_G_A.parameters(), lr=lr, betas=(0.5, 0.999), eps=1e-08, weight_decay=0,
+                               amsgrad=False)
+    optimizer_G_V = optim.Adam(net_G_V.parameters(), lr=lr, betas=(0.5, 0.999), eps=1e-08, weight_decay=0,
+                               amsgrad=False)
 
     scheduler_G = optim.lr_scheduler.ReduceLROnPlateau(optimizer_G, 'min', factor=0.5, patience=50)
     scheduler_D = optim.lr_scheduler.ReduceLROnPlateau(optimizer_D, 'min', factor=0.5, patience=50)
@@ -77,7 +76,7 @@ def train_net(net_G,
     L_seg_CE = nn.CrossEntropyLoss()
     L_seg_MSE = nn.MSELoss()
     L_adv_BCE = nn.BCEWithLogitsLoss()
-    
+
     best_F1 = 0
 
     for epoch in range(epochs):
@@ -93,20 +92,19 @@ def train_net(net_G,
             for batch in train_loader:
                 imgs = batch['image']
                 true_masks = batch['label']
-                
-                
-                #encode_tensor=torch.zeros(len(true_masks), true_masks.max()+1).scatter_(1, true_masks.unsqueeze(1), 1.)
-                encode_tensor=F.one_hot(true_masks.to(torch.int64), num_classes=4)
-                encode_tensor=encode_tensor.permute(0, 3, 1, 2).contiguous()
-                true_masks_background, true_masks_a_, true_masks_v_, true_mask_u_ = torch.split(encode_tensor, split_size_or_sections=1, dim=1)
-                
-                
+
+                #encode_tensor = torch.zeros(len(true_masks), true_masks.max()+1).scatter_(1, true_masks.unsqueeze(1), 1.)
+                encode_tensor = F.one_hot(true_masks.to(torch.int64), num_classes=4)
+                encode_tensor = encode_tensor.permute(0, 3, 1, 2).contiguous()
+                true_masks_background, true_masks_a_, true_masks_v_, true_mask_u_ = torch.split(encode_tensor,
+                                                                                                split_size_or_sections=1,
+                                                                                                dim=1)
+
                 true_masks_a = torch.cat((true_masks_background, true_masks_a_, true_masks_v_, true_mask_u_), dim=1)
                 true_masks_v = torch.cat((true_masks_background, true_masks_a_, true_masks_v_, true_mask_u_), dim=1)
-                
-                _,true_masks_a_decode=torch.max(true_masks_a, 1)
-                _,true_masks_v_decode=torch.max(true_masks_v, 1)
-                
+
+                _, true_masks_a_decode = torch.max(true_masks_a, 1)
+                _, true_masks_v_decode = torch.max(true_masks_v, 1)
 
                 assert imgs.shape[1] == net_G.n_channels, \
                     f'Network has been defined with {net_G.n_channels} input channels, ' \
@@ -127,16 +125,16 @@ def train_net(net_G,
 
                 #################### train D using true_masks_a ##########################
                 optimizer_D.zero_grad()
-                
+
                 real_patch = torch.cat([imgs, true_masks_a], dim=1)
                 real_predict_D = net_D(real_patch)
                 loss_adv_CE_real = L_adv_BCE(real_predict_D, real_labels)
                 loss_adv_CE_real.backward()
                 #########################
-                
+
                 masks_pred_D_A, masks_pred_D_fusion_A = net_G_A(imgs)
-                
-                masks_pred_D_softmax_A = F.softmax(masks_pred_D_A,dim=1)
+
+                masks_pred_D_softmax_A = F.softmax(masks_pred_D_A, dim=1)
                 fake_patch_D = torch.cat([imgs, masks_pred_D_softmax_A], dim=1)
                 fake_predict_D = net_D(fake_patch_D)
                 #fake_predict_D_softmax = torch.sigmoid(fake_predict_D)
@@ -147,9 +145,8 @@ def train_net(net_G,
                 epoch_loss_D += D_Loss.item()
                 writer.add_scalar('Loss/D_train', D_Loss.item(), global_step)
                 pbar.set_postfix(**{'loss (batch)': D_Loss.item()})
-                
-                optimizer_D.step()
 
+                optimizer_D.step()
 
                 #################### train D using true_masks_v ##########################
                 optimizer_D.zero_grad()
@@ -159,9 +156,9 @@ def train_net(net_G,
                 loss_adv_CE_real = L_adv_BCE(real_predict_D, real_labels)
                 loss_adv_CE_real.backward()
                 #########################
-                
+
                 masks_pred_D_V, masks_pred_D_fusion_V = net_G_V(imgs)
-                masks_pred_D_softmax_V = F.softmax(masks_pred_D_V,dim=1)
+                masks_pred_D_softmax_V = F.softmax(masks_pred_D_V, dim=1)
                 fake_patch_D = torch.cat([imgs, masks_pred_D_softmax_V], dim=1)
                 fake_predict_D_V = net_D(fake_patch_D)
                 #fake_predict_D_softmax = F.softmax(fake_predict_D_V)
@@ -172,9 +169,8 @@ def train_net(net_G,
                 epoch_loss_D += D_Loss.item()
                 writer.add_scalar('Loss/D_train', D_Loss.item(), global_step)
                 pbar.set_postfix(**{'loss (batch)': D_Loss.item()})
-                
-                optimizer_D.step()
 
+                optimizer_D.step()
 
                 #################### train D using true_masks##########################
                 optimizer_D.zero_grad()
@@ -187,8 +183,8 @@ def train_net(net_G,
                 masks_pred_D_fusion_A = masks_pred_D_fusion_A.detach()
                 masks_pred_D_fusion_V = masks_pred_D_fusion_V.detach()
 
-                masks_pred_D,_,_,_ = net_G(imgs, masks_pred_D_fusion_A, masks_pred_D_fusion_V)
-                masks_pred_D_softmax = F.softmax(masks_pred_D,dim=1)
+                masks_pred_D, _, _, _ = net_G(imgs, masks_pred_D_fusion_A, masks_pred_D_fusion_V)
+                masks_pred_D_softmax = F.softmax(masks_pred_D, dim=1)
                 fake_patch_D = torch.cat([imgs, masks_pred_D_softmax], dim=1)
                 fake_predict_D = net_D(fake_patch_D)
                 #fake_predict_D_softmax = F.softmax(fake_predict_D)
@@ -200,14 +196,13 @@ def train_net(net_G,
                 epoch_loss_D += D_Loss.item()
                 writer.add_scalar('Loss/D_train', D_Loss.item(), global_step)
                 pbar.set_postfix(**{'loss (batch)': D_Loss.item()})
-                
+
                 optimizer_D.step()
-                
 
                 ################### train G_A ###########################
                 optimizer_G_A.zero_grad()
                 masks_pred_G_A, masks_pred_D_fusion_A = net_G_A(imgs)
-                masks_pred_G_softmax_A = F.softmax(masks_pred_G_A,dim=1)
+                masks_pred_G_softmax_A = F.softmax(masks_pred_G_A, dim=1)
                 fake_patch_G = torch.cat([imgs, masks_pred_G_softmax_A], dim=1)
                 fake_predict_G = net_D(fake_patch_G)
 
@@ -215,8 +210,8 @@ def train_net(net_G,
                 loss_seg_CE = L_seg_CE(masks_pred_G_A, true_masks)
                 loss_seg_MSE = L_seg_MSE(masks_pred_G_softmax_A, encode_tensor)
 
-                G_Loss = gama_hyper*loss_adv_G_fake + beta_hyper*loss_seg_CE + alpha_hyper*loss_seg_MSE 
-                
+                G_Loss = gama_hyper * loss_adv_G_fake + beta_hyper * loss_seg_CE + alpha_hyper * loss_seg_MSE
+
                 epoch_loss_G += G_Loss.item()
                 writer.add_scalar('Loss/G_train_A', G_Loss.item(), global_step)
                 pbar.set_postfix(**{'loss (batch)': G_Loss.item()})
@@ -226,15 +221,15 @@ def train_net(net_G,
                 ################### train G_V ###########################
                 optimizer_G_V.zero_grad()
                 masks_pred_G_V, masks_pred_D_fusion_V = net_G_V(imgs)
-                masks_pred_G_softmax_V = F.softmax(masks_pred_G_V,dim=1)
+                masks_pred_G_softmax_V = F.softmax(masks_pred_G_V, dim=1)
                 fake_patch_G = torch.cat([imgs, masks_pred_G_softmax_V], dim=1)
                 fake_predict_G = net_D(fake_patch_G)
 
                 loss_adv_G_fake = L_adv_BCE(fake_predict_G, real_labels)
                 loss_seg_CE = L_seg_CE(masks_pred_G_V, true_masks)
                 loss_seg_MSE = L_seg_MSE(masks_pred_G_softmax_V, encode_tensor)
-                G_Loss = gama_hyper*loss_adv_G_fake + beta_hyper*loss_seg_CE + alpha_hyper*loss_seg_MSE 
-                
+                G_Loss = gama_hyper * loss_adv_G_fake + beta_hyper * loss_seg_CE + alpha_hyper * loss_seg_MSE
+
                 epoch_loss_G += G_Loss.item()
                 writer.add_scalar('Loss/G_train_A', G_Loss.item(), global_step)
                 pbar.set_postfix(**{'loss (batch)': G_Loss.item()})
@@ -246,16 +241,16 @@ def train_net(net_G,
                 masks_pred_G_A_part = masks_pred_D_fusion_A.detach()
                 masks_pred_G_V_part = masks_pred_D_fusion_V.detach()
                 masks_pred_G, side_1, side_2, side_3 = net_G(imgs, masks_pred_G_A_part, masks_pred_G_V_part)
-                masks_pred_G_softmax = F.softmax(masks_pred_G,dim=1)
-                side_1_softmax = F.softmax(side_1,dim=1)
-                side_2_softmax = F.softmax(side_2,dim=1)
-                side_3_softmax = F.softmax(side_3,dim=1)
+                masks_pred_G_softmax = F.softmax(masks_pred_G, dim=1)
+                side_1_softmax = F.softmax(side_1, dim=1)
+                side_2_softmax = F.softmax(side_2, dim=1)
+                side_3_softmax = F.softmax(side_3, dim=1)
                 fake_patch_G = torch.cat([imgs, masks_pred_G_softmax], dim=1)
                 fake_predict_G = net_D(fake_patch_G)
 
                 loss_adv_G_fake = L_adv_BCE(fake_predict_G, real_labels)
                 loss_seg_CE = L_seg_CE(masks_pred_G, true_masks)
-                
+
                 loss_seg_MSE = L_seg_MSE(masks_pred_G_softmax, encode_tensor)
                 # S1 output
                 loss_seg_CE_1 = L_seg_CE(side_1, true_masks)
@@ -267,9 +262,10 @@ def train_net(net_G,
                 loss_seg_CE_3 = L_seg_CE(side_3, true_masks)
                 loss_seg_MSE_3 = L_seg_MSE(side_3_softmax, encode_tensor)
 
-                G_Loss = gama_hyper*loss_adv_G_fake + beta_hyper*loss_seg_CE + alpha_hyper*loss_seg_MSE + 1/2*(alpha_hyper*loss_seg_MSE_1 + beta_hyper*loss_seg_CE_1) + \
-                    1/4*(alpha_hyper*loss_seg_MSE_2 + beta_hyper*loss_seg_CE_2) + 1/8*(alpha_hyper*loss_seg_MSE_3 + beta_hyper*loss_seg_CE_3)
-                
+                G_Loss = gama_hyper * loss_adv_G_fake + beta_hyper * loss_seg_CE + alpha_hyper * loss_seg_MSE + 1 / 2 * (
+                            alpha_hyper * loss_seg_MSE_1 + beta_hyper * loss_seg_CE_1) + \
+                         1 / 4 * (alpha_hyper * loss_seg_MSE_2 + beta_hyper * loss_seg_CE_2) + 1 / 8 * (
+                                     alpha_hyper * loss_seg_MSE_3 + beta_hyper * loss_seg_CE_3)
 
                 epoch_loss_G += G_Loss.item()
                 writer.add_scalar('Loss/G_train', G_Loss.item(), global_step)
@@ -282,9 +278,16 @@ def train_net(net_G,
                 pbar.update(imgs.shape[0])
                 global_step += 1
                 with torch.no_grad():
-                    if global_step % (n_train // ( batch_size)) == 0:
-                    #if True:
-                        acc, sensitivity, specificity, precision, G, F1_score, mse, iou,_ = eval_net(epoch, net_G, net_G_A, net_G_V, args.dataset, val_loader, device, mode='whole',train_or='train')[0:9]
+                    if global_step % (n_train // (batch_size)) == 0:
+                        #if True:
+                        acc, sensitivity, specificity, precision, G, F1_score, mse, iou, _ = eval_net(epoch, net_G,
+                                                                                                      net_G_A, net_G_V,
+                                                                                                      args.dataset,
+                                                                                                      val_loader,
+                                                                                                      device,
+                                                                                                      mode='whole',
+                                                                                                      train_or='train')[
+                                                                                             0:9]
 
                         scheduler_G.step(G_Loss.item())
                         scheduler_D.step(D_Loss.item())
@@ -306,16 +309,16 @@ def train_net(net_G,
                         logging.info('Validation acc: {}'.format(acc))
                         writer.add_scalar('Acc/val_G', acc, global_step)
 
-                        prediction_binary = (F.softmax(masks_pred_G,dim=1) > 0.5)
+                        prediction_binary = (F.softmax(masks_pred_G, dim=1) > 0.5)
                         prediction_binary_gpu = prediction_binary.to(device=device, dtype=mask_type)
                         total_train_pixel += prediction_binary_gpu.nelement()
-                        real_predict_binary = (F.softmax(real_predict_D,dim=1) > 0.5)
+                        real_predict_binary = (F.softmax(real_predict_D, dim=1) > 0.5)
                         real_predict_binary_gpu = real_predict_binary.to(device=device, dtype=mask_type)
-                        fake_predict_binary = (F.softmax(fake_predict_D,dim=1) > 0.5)
+                        fake_predict_binary = (F.softmax(fake_predict_D, dim=1) > 0.5)
                         fake_predict_binary_gpu = fake_predict_binary.to(device=device, dtype=mask_type)
                         prediction_binary_DR = real_predict_binary_gpu.eq(real_labels.data).sum().item()
                         prediction_binary_DF = fake_predict_binary_gpu.eq(fake_labels.data).sum().item()
-                        aver_prediction_binary_D = (prediction_binary_DR + prediction_binary_DF)/2
+                        aver_prediction_binary_D = (prediction_binary_DR + prediction_binary_DF) / 2
                         train_accuracy_D = 100 * aver_prediction_binary_D / total_train_pixel
                         logging.info('Validation accuracy: {}'.format(train_accuracy_D))
                         writer.add_scalar('Acc/Val_D', train_accuracy_D, global_step)
@@ -323,28 +326,25 @@ def train_net(net_G,
                         total_train_pixel = 0
 
             if F1_score > best_F1:
-                best_F1=F1_score
+                best_F1 = F1_score
                 if save_cp:
                     try:
                         os.mkdir(dir_checkpoint)
                         logging.info('Created checkpoint directory')
                     except OSError:
                         pass
-                    torch.save(net_G.state_dict(),
-                            dir_checkpoint + f'CP_best_F1_all.pth')
-                    torch.save(net_G_A.state_dict(),
-                            dir_checkpoint + f'CP_best_F1_A.pth')
-                    torch.save(net_G_V.state_dict(),
-                            dir_checkpoint + f'CP_best_F1_V.pth')
+                    torch.save(net_G.state_dict(), dir_checkpoint + f'CP_best_F1_G.pth')
+                    torch.save(net_D.state_dict(), dir_checkpoint + f'CP_best_F1_D.pth')
+                    torch.save(net_G_A.state_dict(), dir_checkpoint + f'CP_best_F1_A.pth')
+                    torch.save(net_G_V.state_dict(), dir_checkpoint + f'CP_best_F1_V.pth')
                     logging.info(f'Checkpoint {epoch + 1} saved !')
-
 
     writer.close()
 
 
-
 def get_args():
-    parser = argparse.ArgumentParser(description='Train the UNet on images and target masks', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(description='Train the UNet on images and target masks',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--epochs', type=int, default=240, help='Number of epochs', dest='epochs')
     parser.add_argument('--batch-size', type=int, default=6, help='Batch size', dest='batchsize')
     parser.add_argument('--learning-rate', type=float, nargs='?', default=2e-4, help='Learning rate', dest='lr')
@@ -353,7 +353,8 @@ def get_args():
     parser.add_argument('--discriminator', type=str, default=False, help='type of discriminator', dest='dis')
     parser.add_argument('--dataset', type=str, help='dataset name', dest='dataset')
     parser.add_argument('--validation', type=float, default=5.0, help='Percent of the data validation', dest='val')
-    parser.add_argument('--uniform', type=str, default='False', help='whether to uniform the image size', dest='uniform')
+    parser.add_argument('--uniform', type=str, default='False', help='whether to uniform the image size',
+                        dest='uniform')
     parser.add_argument('--seed_num', type=int, default=42, help='Validation split seed', dest='seed')
     parser.add_argument('--alpha', dest='alpha', type=float, help='alpha')
     parser.add_argument('--beta', dest='beta', type=float, help='beta')
@@ -363,18 +364,18 @@ def get_args():
 
 
 if __name__ == '__main__':
-    
+
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     args = get_args()
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'mps')
     logging.info(f'Using device {device}')
 
-    img_size = Define_image_size(args.uniform, args.dataset)
+    img_size = define_image_size(args.uniform, args.dataset)
 
-    net_G = Generator_main(input_channels=3, n_filters = 32, n_classes=4, bilinear=False)
-    net_D = Discriminator(input_channels=7, n_filters = 32, n_classes=4, bilinear=False)
-    net_G_A = Generator_branch(input_channels=3, n_filters = 32, n_classes=4, bilinear=False)
-    net_G_V = Generator_branch(input_channels=3, n_filters = 32, n_classes=4, bilinear=False)
+    net_G = Generator_main(input_channels=3, n_filters=32, n_classes=4, bilinear=False)
+    net_D = Discriminator(input_channels=7, n_filters=32, n_classes=4, bilinear=False)
+    net_G_A = Generator_branch(input_channels=3, n_filters=32, n_classes=4, bilinear=False)
+    net_G_V = Generator_branch(input_channels=3, n_filters=32, n_classes=4, bilinear=False)
 
     logging.info(f'Network_G:\n'
                  f'\t{net_G.n_channels} input channels\n'
@@ -387,13 +388,16 @@ if __name__ == '__main__':
                  f'\t{"Bilinear" if net_D.bilinear else "Transposed conv"} upscaling')
 
     if args.load:
-        net_G.load_state_dict(
-            torch.load(args.load, map_location=device)
-        )
+        net_G.load_state_dict(torch.load(f'{args.load}/CP_best_F1_G.pth', map_location=device))
         logging.info(f'Model loaded from {args.load}')
-        net_D.load_state_dict(
-            torch.load(args.load, map_location=device)
-        )
+
+        net_D.load_state_dict(torch.load(f'{args.load}/CP_best_F1_D.pth', map_location=device))
+        logging.info(f'Model loaded from {args.load}')
+
+        net_G_A.load_state_dict(torch.load(f'{args.load}/CP_best_F1_A.pth', map_location=device))
+        logging.info(f'Model loaded from {args.load}')
+
+        net_G_V.load_state_dict(torch.load(f'{args.load}/CP_best_F1_V.pth', map_location=device))
         logging.info(f'Model loaded from {args.load}')
 
     net_G.to(device=device)
@@ -401,19 +405,16 @@ if __name__ == '__main__':
     net_G_A.to(device=device)
     net_G_V.to(device=device)
 
-
     train_net(net_G=net_G,
-                net_D=net_D,
-                net_G_A=net_G_A,
-                net_G_V=net_G_V,
-                epochs=args.epochs,
-                batch_size=args.batchsize,
-                alpha_hyper=args.alpha,
-                beta_hyper=args.beta,
-                gama_hyper=args.gama,
-                lr=args.lr,
-                device=device,
-                val_percent=args.val / 100,
-                image_size=img_size)
-    
-
+              net_D=net_D,
+              net_G_A=net_G_A,
+              net_G_V=net_G_V,
+              epochs=args.epochs,
+              batch_size=args.batchsize,
+              alpha_hyper=args.alpha,
+              beta_hyper=args.beta,
+              gama_hyper=args.gama,
+              lr=args.lr,
+              device=device,
+              val_percent=args.val / 100,
+              image_size=img_size)
